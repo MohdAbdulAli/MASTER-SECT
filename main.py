@@ -2264,7 +2264,7 @@ class JarvisLive:
                     continue
 
                 # Invalid API key — stop hammering the API, prompt re-configuration
-                if "API key not valid" in err_str or "1007" in err_str:
+                if "API key not valid" in err_str or "1007" in err_str or "1008" in err_str or "invalid authentication" in err_str.lower():
                     self.ui.write_log("ERR: API key invalid — please re-enter your key.")
                     self.ui.set_state("SLEEPING")
                     self.ui.prompt_reconfig()
