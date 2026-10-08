@@ -33,7 +33,7 @@ from PyQt6.QtCore import (
 )
 from PyQt6.QtGui import (
     QBrush, QColor, QConicalGradient, QDragEnterEvent, QDropEvent, QFont,
-    QFontDatabase, QKeySequence, QLinearGradient, QPainter, QPainterPath,
+    QFontDatabase, QIcon, QKeySequence, QLinearGradient, QPainter, QPainterPath,
     QPen, QPixmap, QRadialGradient, QShortcut,
 )
 # Video playback for the HUD. Part of PyQt6, so it costs no new dependency —
@@ -2974,6 +2974,9 @@ class MainWindow(QMainWindow):
             apply_ui_accent(_ui_color)
 
         self.setWindowTitle(f"{_display} — {APP_VERSION}")
+        _app_ico = Path(__file__).resolve().parent / "config" / "jarvis.ico"
+        if _app_ico.exists():
+            self.setWindowIcon(QIcon(str(_app_ico)))
         self.setMinimumSize(_MIN_W, _MIN_H)
         self.resize(_DEFAULT_W, _DEFAULT_H)
 
@@ -3492,9 +3495,9 @@ class MainWindow(QMainWindow):
     @staticmethod
     def _build_jarvis_icon(out_path: Path) -> bool:
         """
-        Render a JARVIS arc-reactor icon at 4× resolution and downsample
-        for crisp results at all sizes. Saves a multi-res .ico to out_path.
-        Returns True on success.
+        Render a high-resolution futuristic glowing neon JARVIS Arc Reactor icon
+        at 4× supersampling and downsample for crisp vector quality.
+        Saves multi-res .ico and high-res .png to out_path folder.
         """
         try:
             import math
@@ -3504,86 +3507,123 @@ class MainWindow(QMainWindow):
         except ImportError:
             return False
 
-        CYAN   = (0, 212, 255)
-        DIM    = (0, 100, 140)
-        DARK   = (0, 6, 10)
-        GLOW   = (0, 160, 200)
-        WHITE  = (220, 240, 255)
-
-        def _render(sz: int) -> PIL.Image.Image:
-            S  = sz * 4                     # draw at 4× then downscale
-            img = PIL.Image.new("RGBA", (S, S), (0, 0, 0, 0))
-            d   = PIL.ImageDraw.Draw(img)
+        def _render_frame(sz: int) -> PIL.Image.Image:
+            S = sz * 4  # 4x supersampling
             cx = cy = S // 2
+            R = S // 2 - 8  # main radius
+            
+            base = PIL.Image.new("RGBA", (S, S), (0, 0, 0, 0))
 
-            # ── filled background circle ──────────────────────────────────
-            R = S // 2 - 2
-            d.ellipse([cx-R, cy-R, cx+R, cy+R], fill=(*DARK, 255))
-
-            # ── outer border ring ─────────────────────────────────────────
-            lw = max(2, S // 40)
-            d.ellipse([cx-R, cy-R, cx+R, cy+R],
-                      outline=(*CYAN, 220), width=lw)
-
-            # ── mid decorative ring ───────────────────────────────────────
-            R2 = int(R * 0.72)
-            d.ellipse([cx-R2, cy-R2, cx+R2, cy+R2],
-                      outline=(*DIM, 180), width=max(1, lw // 2))
-
-            # ── 6 radial spokes (hex bolt) ────────────────────────────────
-            R_inner = int(R * 0.30)
-            R_outer = int(R * 0.62)
-            spoke_w = max(1, S // 80)
-            for i in range(6):
-                angle = math.radians(i * 60 - 30)
-                x1 = cx + int(R_inner * math.cos(angle))
-                y1 = cy + int(R_inner * math.sin(angle))
-                x2 = cx + int(R_outer * math.cos(angle))
-                y2 = cy + int(R_outer * math.sin(angle))
-                d.line([x1, y1, x2, y2], fill=(*GLOW, 200), width=spoke_w)
-
-            # ── 6 tick marks on outer ring ────────────────────────────────
-            for i in range(6):
-                angle = math.radians(i * 60)
-                for dr in range(lw * 2):
-                    rx = (R - lw - dr)
-                    d.point(
-                        [cx + int(rx * math.cos(angle)),
-                         cy + int(rx * math.sin(angle))],
-                        fill=(*WHITE, 220),
-                    )
-
-            # ── inner glowing ring ────────────────────────────────────────
-            Ri = int(R * 0.26)
-            d.ellipse([cx-Ri, cy-Ri, cx+Ri, cy+Ri],
-                      outline=(*CYAN, 255), width=max(2, lw))
-
-            # ── bright glow soft blur applied before core ─────────────────
-            # (draw a slightly larger cyan circle on a separate layer)
+            # 1. Outer Ambient Glow (Cyan/Violet halo)
             glow_layer = PIL.Image.new("RGBA", (S, S), (0, 0, 0, 0))
             gd = PIL.ImageDraw.Draw(glow_layer)
-            Rc = int(R * 0.13)
-            gd.ellipse([cx-Rc*2, cy-Rc*2, cx+Rc*2, cy+Rc*2],
-                       fill=(*CYAN, 110))
-            glow_layer = glow_layer.filter(PIL.ImageFilter.GaussianBlur(S // 14))
-            img = PIL.Image.alpha_composite(img, glow_layer)
-            d   = PIL.ImageDraw.Draw(img)
+            gd.ellipse([cx - R - 4, cy - R - 4, cx + R + 4, cy + R + 4], fill=(0, 160, 255, 45))
+            gd.ellipse([cx - int(R * 0.7), cy - int(R * 0.7), cx + int(R * 0.7), cy + int(R * 0.7)], fill=(120, 0, 255, 35))
+            glow_layer = glow_layer.filter(PIL.ImageFilter.GaussianBlur(max(2, S // 25)))
+            base = PIL.Image.alpha_composite(base, glow_layer)
 
-            # ── core dot ──────────────────────────────────────────────────
-            d.ellipse([cx-Rc, cy-Rc, cx+Rc, cy+Rc], fill=(*WHITE, 255))
+            d = PIL.ImageDraw.Draw(base)
 
-            # ── downscale to target size ──────────────────────────────────
-            return img.resize((sz, sz), PIL.Image.LANCZOS)
+            # 2. Outer Dark Hull Circle
+            d.ellipse([cx - R, cy - R, cx + R, cy + R], fill=(5, 9, 18, 245))
+
+            # 3. Metallic Outer Rim (Double Border with neon accent)
+            lw_outer = max(2, S // 45)
+            d.ellipse([cx - R, cy - R, cx + R, cy + R], outline=(0, 200, 255, 230), width=lw_outer)
+            
+            R_rim_in = R - lw_outer - max(1, S // 100)
+            d.ellipse([cx - R_rim_in, cy - R_rim_in, cx + R_rim_in, cy + R_rim_in], outline=(0, 70, 130, 180), width=max(1, S // 120))
+
+            # 4. Outer Notch Ticks (12 ticks at 30 deg intervals)
+            tick_len = max(2, S // 30)
+            for i in range(12):
+                ang = math.radians(i * 30)
+                cos_a, sin_a = math.cos(ang), math.sin(ang)
+                x1 = cx + int((R - lw_outer) * cos_a)
+                y1 = cy + int((R - lw_outer) * sin_a)
+                x2 = cx + int((R - lw_outer - tick_len) * cos_a)
+                y2 = cy + int((R - lw_outer - tick_len) * sin_a)
+                color = (0, 240, 255, 255) if i % 3 == 0 else (0, 140, 200, 200)
+                w = max(2, S // 70) if i % 3 == 0 else max(1, S // 100)
+                d.line([x1, y1, x2, y2], fill=color, width=w)
+
+            # 5. Segmented Arc Reactor Coils (10 arc segments)
+            R_coil_out = int(R * 0.78)
+            R_coil_in  = int(R * 0.60)
+            num_coils = 10
+            gap_deg = 8
+            seg_deg = (360 - num_coils * gap_deg) / num_coils
+
+            for i in range(num_coils):
+                start_angle = i * (seg_deg + gap_deg) - 90
+                end_angle = start_angle + seg_deg
+                
+                bbox_out = [cx - R_coil_out, cy - R_coil_out, cx + R_coil_out, cy + R_coil_out]
+                bbox_in  = [cx - R_coil_in,  cy - R_coil_in,  cx + R_coil_in,  cy + R_coil_in]
+
+                d.pieslice(bbox_out, start_angle, end_angle, fill=(0, 210, 255, 170), outline=(0, 240, 255, 240), width=max(1, S // 120))
+                d.pieslice(bbox_in, start_angle - 1, end_angle + 1, fill=(5, 9, 18, 255))
+
+            # 6. Mid Precision Ring & Geometric Hex Spokes
+            R_mid = int(R * 0.52)
+            d.ellipse([cx - R_mid, cy - R_mid, cx + R_mid, cy + R_mid], outline=(0, 180, 240, 220), width=max(1, S // 90))
+
+            R_core_out = int(R * 0.32)
+            spoke_w = max(1, S // 75)
+            for i in range(6):
+                ang = math.radians(i * 60 + 30)
+                cos_a, sin_a = math.cos(ang), math.sin(ang)
+                x1 = cx + int(R_core_out * cos_a)
+                y1 = cy + int(R_core_out * sin_a)
+                x2 = cx + int(R_mid * cos_a)
+                y2 = cy + int(R_mid * sin_a)
+                d.line([x1, y1, x2, y2], fill=(0, 230, 255, 220), width=spoke_w)
+                
+                dot_r = max(2, S // 80)
+                d.ellipse([x2 - dot_r, y2 - dot_r, x2 + dot_r, y2 + dot_r], fill=(200, 245, 255, 255))
+
+            # 7. Inner Core Structure Ring
+            d.ellipse([cx - R_core_out, cy - R_core_out, cx + R_core_out, cy + R_core_out], outline=(0, 240, 255, 255), width=max(2, S // 60))
+
+            # Inner Triangular Core Accent
+            tri_r = int(R_core_out * 0.75)
+            tri_pts = []
+            for i in range(3):
+                ang = math.radians(i * 120 - 90)
+                tri_pts.append((cx + int(tri_r * math.cos(ang)), cy + int(tri_r * math.sin(ang))))
+            d.polygon(tri_pts, outline=(0, 255, 255, 240), width=max(2, S // 70))
+
+            # 8. Bright Core Radial Bloom Layer
+            core_glow = PIL.Image.new("RGBA", (S, S), (0, 0, 0, 0))
+            cgd = PIL.ImageDraw.Draw(core_glow)
+            Rc = int(R * 0.18)
+            cgd.ellipse([cx - Rc * 2, cy - Rc * 2, cx + Rc * 2, cy + Rc * 2], fill=(0, 220, 255, 180))
+            cgd.ellipse([cx - Rc, cy - Rc, cx + Rc, cy + Rc], fill=(180, 245, 255, 220))
+            core_glow = core_glow.filter(PIL.ImageFilter.GaussianBlur(max(2, S // 20)))
+            base = PIL.Image.alpha_composite(base, core_glow)
+
+            # 9. Pure White Central Core Dot
+            d = PIL.ImageDraw.Draw(base)
+            Rc_inner = int(R * 0.12)
+            d.ellipse([cx - Rc_inner, cy - Rc_inner, cx + Rc_inner, cy + Rc_inner], fill=(240, 252, 255, 255))
+            
+            Rc_core = int(R * 0.07)
+            d.ellipse([cx - Rc_core, cy - Rc_core, cx + Rc_core, cy + Rc_core], fill=(255, 255, 255, 255))
+
+            return base.resize((sz, sz), PIL.Image.LANCZOS)
 
         try:
             sizes  = [256, 128, 64, 48, 32, 16]
-            frames = [_render(s) for s in sizes]
+            frames = [_render_frame(s) for s in sizes]
+            out_path.parent.mkdir(parents=True, exist_ok=True)
             frames[0].save(
                 out_path,
                 format="ICO",
                 append_images=frames[1:],
                 sizes=[(s, s) for s in sizes],
             )
+            png_path = out_path.with_suffix(".png")
+            _render_frame(512).save(png_path, format="PNG")
             return True
         except Exception as e:
             print(f"[Shortcut] ⚠️  Icon generation failed: {e}")
