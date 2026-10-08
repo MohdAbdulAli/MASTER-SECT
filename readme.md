@@ -392,6 +392,5 @@ Engineered by a developer building a real-world JARVIS-style assistant.
 
 | Platform | Link |
 | --- | --- |
-| Instagram | [Instagram](https://www.instagram.com/abdul.ali_786) |
-| Facebook | [Facebook](https://www.facebook.com/abdul.ali.0786) | 
-
+| Instagram | [@abdul.ali_786](https://www.instagram.com/abdul.ali_786) |
+| Facebook | [@abdul.ali.0786](https://www.facebook.com/abdul.ali.0786) | 
